@@ -1,0 +1,80 @@
+PUBKEY="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQC1/qOp3sDncerrKYEg3fkl42kpPJ5znC645QPzraxdUKo6gsi1/WaXYY49kdfHMfp4KZFTSFYQbnmYHO5d0RZUUTeel/85W+rUdSwXxTIxD8XUB3vYV1ocI7c582YsPVTrrPJ2c1uoGwCEuIgAnWoFLrw97qGk3yGN57WhtIqxPf8pmR8w+Qq1nMUCIsL6ztHIltzw5QvKwLhbMzJECifVMMhg+VM3iqYTJ8Dux5QraSKVBjbGGsVe1HirCo0AQ09XS5ex1oH1Hbn7M3glwmQ/N9Mq0O1Azb5+MrzfCo82fI8Zxlfwb7/tpIviNE/8oY1L1GmlRnW0qBn+prEK+dnEbnPHIaW2O3iNTuLVwJ/sVwkfLiw6tuGf6FWf8qepCp8ynpk98Z0CknpgvtqztNXpf7uoWJd1XRqKVliwHp2sb10ECpSlxDz4iymPNlw2tOQly7ZdBPJUt24BKPyRmuEJUOuQhhp90mIKZ23Aks/+YboN/gqkNwOXpUGD8v/heIij45EReDERBzKuaVMSVBoa9fRG2iomBsmybkbb/3yKzooi8IHfwiWVlNxtSTTRloADS8w5tjITMXcyZrNhdnAzAfOBWttNH/ZNuQ6YfRR5PeritP1RY9xdhTLOjZ4Mmd4gmktqZn2UZg6foIWB80hakfTsyA94qFPWYyPlv7qifQ== i@philipp.ninja"
+
+echo "keyid: 0xD1680A47FBA066ED"
+echo "pgp pub key: https://gpg.acc.si/gpg.pub"
+echo "ssh public key:"
+echo "$PUBKEY"
+echo ""
+
+if which xclip >/dev/null 2>&1 && test -n "$DISPLAY"; then
+  echo "$PUBKEY" | xclip -selection c
+fi
+
+if which pbcopy >/dev/null 2>&1 ; then
+  echo "$PUBKEY" | pbcopy
+fi
+
+yes_or_no() {
+    while true; do
+        read -p "$* [y/n]: " yn
+        case $yn in
+            [Yy]*) return 0  ;;  
+            [Nn]*) echo "Aborted" ; return  1 ;;
+        esac
+    done
+}
+
+requirements() {
+    INSTALL=
+    
+    if [ $(dpkg-query -W -f='${Status}' scdaemon 2>/dev/null | grep -c "ok installed") -eq 0 ] ; then
+        INSTALL=1
+    fi
+
+    if [ $(dpkg-query -W -f='${Status}' pcscd 2>/dev/null | grep -c "ok installed") -eq 0 ] ; then
+        INSTALL=1
+    fi
+
+    if [ ! which gpg2 >/dev/null 2>&1 ] ; then
+        INSTALL=1
+    fi
+
+    if [ ! which gnupg-agent >/dev/null 2>&1 ] ; then
+        INSTALL=1
+    fi
+
+    if [ -n "$INSTALL" ] ; then
+        sudo apt-get install -y scdaemon pcscd gnupg-agent gnupg2
+    fi
+}
+
+start_gpg() {
+    requirements;
+
+    export GPG_TTY="`tty`" ; 
+
+    # get the ssh socket path
+    export SSH_AUTH_SOCK=`gpgconf --list-dirs agent-ssh-socket` ;
+
+    # older versions of gpgconf dont print the ssh socket for some reason
+    # bruteforce search through some common paths
+    if [ ! -S "$SSH_AUTH_SOCK" ] ; then
+      export SSH_AUTH_SOCK=${HOME}/.gnupg/S.gpg-agent.ssh
+    fi
+
+    if [ ! -S "$SSH_AUTH_SOCK" ] ; then
+      export SSH_AUTH_SOCK="/run/user/$(id -u)/gnupg/S.gpg-agent.ssh"
+    fi
+
+    # no agent found (agent may not be running)
+    # launch the agent and get the socket path from him
+    if [ ! -S "$SSH_AUTH_SOCK" ] ; then
+      gpgconf --kill gpg-agent 2>&1 >/dev/null
+      eval $(gpg-agent --daemon --enable-ssh-support --max-cache-ttl 300 --default-cache-ttl 300)
+    fi
+
+    `getent passwd $(id -un) | cut -d : -f 7`
+}
+
+yes_or_no "Start gpg agent?" && start_gpg
+
