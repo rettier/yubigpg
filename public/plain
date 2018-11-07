@@ -26,7 +26,7 @@ yes_or_no() {
 
 GET_SHELL=
 
-requirements_osx() {
+setup_osx() {
     GET_SHELL='dscl . -read ${HOME} UserShell | cut -d" " -f2'
     INSTALL=
     
@@ -38,9 +38,14 @@ requirements_osx() {
         echo "Installing requirements..."
         brew install gpg2
     fi
+
+    # on osx the gpg agent is not very table, disconnects etc can get it to stop working quickly
+    # due to this we always restart the gpg agent, if something does not work simply rerun the 
+    # script instead of having to manually fix it 
+    gpgconf --kill gpg-agent >/dev/null 2>&1
 }
 
-requirements_debian() {
+setup_debian() {
     GET_SHELL='getent passwd $(id -un) | cut -d : -f 7'
     INSTALL=
     
@@ -56,32 +61,42 @@ requirements_debian() {
         INSTALL=1
     fi
 
-    if ! which gnupg-agent >/dev/null 2>&1 ; then
+    if ! which gpg-agent >/dev/null 2>&1 ; then
         INSTALL=1
     fi
 
     if [ -n "$INSTALL" ] ; then
         echo "Installing requirements..."
+        sudo apt-get update >/dev/null 2>&1 
         sudo apt-get install -y scdaemon pcscd gnupg-agent gnupg2
     fi
 }
 
+final_debian() {
+  return
+}
+
+final_osx() {
+  # sometimes ssh stops working but signing still works, apparently this fixes it
+  echo UPDATESTARTUPTTY | gpg-connect-agent >/dev/null 2>&1
+}
+
 start_gpg() {
     case "$(uname -s)" in
-        Linux*)  requirements_debian ;;
-        Darwin*) requirements_osx ;;
+        Linux*)  setup_debian ;;
+        Darwin*) setup_osx ;;
         *)       echo "Unknown OS, hoping requirements are met..." ;;
     esac
 
-    export GPG_TTY="`tty`" ; 
+    export GPG_TTY="`tty`"
 
     # get the ssh socket path
-    export SSH_AUTH_SOCK=`gpgconf --list-dirs agent-ssh-socket` ;
+    export SSH_AUTH_SOCK="`gpgconf --list-dirs agent-ssh-socket`"
 
     # older versions of gpgconf dont print the ssh socket for some reason
     # bruteforce search through some common paths
     if [ ! -S "$SSH_AUTH_SOCK" ] ; then
-      export SSH_AUTH_SOCK=${HOME}/.gnupg/S.gpg-agent.ssh
+      export SSH_AUTH_SOCK="${HOME}/.gnupg/S.gpg-agent.ssh"
     fi
 
     if [ ! -S "$SSH_AUTH_SOCK" ] ; then
@@ -95,10 +110,16 @@ start_gpg() {
       eval $(gpg-agent --daemon --enable-ssh-support --max-cache-ttl 300 --default-cache-ttl 300)
     fi
 
-    if [ ! $(gpg --list-keys | grep 7B9C0E5F80F9A383D16EF740D1680A47FBA066ED 2>&1 >/dev/null) ] ; then
+    if ! gpg --list-keys --keyid-format LONG | grep D1680A47FBA066ED 2>&1 >/dev/null ; then
       echo "Importing my public key..."
       curl -s https://gpg.acc.si/pgp.pub | gpg --import >/dev/null 2>&1
     fi
+
+    case "$(uname -s)" in
+        Linux*)  final_debian ;;
+        Darwin*) final_osx ;;
+        *)       echo "Unknown OS, hoping requirements are met..." ;;
+    esac
 
     $(eval $GET_SHELL)
 }
