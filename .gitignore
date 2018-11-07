@@ -1,2 +1,4 @@
 .firebaserc
 .firebase
+*.swo
+public/quick

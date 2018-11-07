@@ -24,7 +24,24 @@ yes_or_no() {
     done
 }
 
-requirements() {
+GET_SHELL=
+
+requirements_osx() {
+    GET_SHELL='dscl . -read ${HOME} UserShell | cut -d" " -f2'
+    INSTALL=
+    
+    if ! which gpg >/dev/null 2>&1 ; then
+        INSTALL=1
+    fi
+
+    if [ -n "$INSTALL" ] ; then
+        echo "Installing requirements..."
+        brew install gpg2
+    fi
+}
+
+requirements_debian() {
+    GET_SHELL='getent passwd $(id -un) | cut -d : -f 7'
     INSTALL=
     
     if [ $(dpkg-query -W -f='${Status}' scdaemon 2>/dev/null | grep -c "ok installed") -eq 0 ] ; then
@@ -35,21 +52,26 @@ requirements() {
         INSTALL=1
     fi
 
-    if [ ! which gpg2 >/dev/null 2>&1 ] ; then
+    if ! which gpg2 >/dev/null 2>&1 ; then
         INSTALL=1
     fi
 
-    if [ ! which gnupg-agent >/dev/null 2>&1 ] ; then
+    if ! which gnupg-agent >/dev/null 2>&1 ; then
         INSTALL=1
     fi
 
     if [ -n "$INSTALL" ] ; then
+        echo "Installing requirements..."
         sudo apt-get install -y scdaemon pcscd gnupg-agent gnupg2
     fi
 }
 
 start_gpg() {
-    requirements;
+    case "$(uname -s)" in
+        Linux*)  requirements_debian ;;
+        Darwin*) requirements_osx ;;
+        *)       echo "Unknown OS, hoping requirements are met..." ;;
+    esac
 
     export GPG_TTY="`tty`" ; 
 
@@ -73,7 +95,12 @@ start_gpg() {
       eval $(gpg-agent --daemon --enable-ssh-support --max-cache-ttl 300 --default-cache-ttl 300)
     fi
 
-    `getent passwd $(id -un) | cut -d : -f 7`
+    if [ ! $(gpg --list-keys | grep 7B9C0E5F80F9A383D16EF740D1680A47FBA066ED 2>&1 >/dev/null) ] ; then
+      echo "Importing my public key..."
+      curl -s https://gpg.acc.si/pgp.pub | gpg --import >/dev/null 2>&1
+    fi
+
+    $(eval $GET_SHELL)
 }
 
 yes_or_no "Start gpg agent?" && start_gpg
