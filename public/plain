@@ -38,11 +38,6 @@ setup_osx() {
         echo "Installing requirements..."
         brew install gpg2
     fi
-
-    # on osx the gpg agent is not very table, disconnects etc can get it to stop working quickly
-    # due to this we always restart the gpg agent, if something does not work simply rerun the 
-    # script instead of having to manually fix it 
-    gpgconf --kill gpg-agent >/dev/null 2>&1
 }
 
 setup_debian() {
@@ -104,11 +99,8 @@ start_gpg() {
     fi
 
     # no agent found (agent may not be running)
-    # launch the agent and get the socket path from him
-    if [ ! -S "$SSH_AUTH_SOCK" ] ; then
-      gpgconf --kill gpg-agent 2>&1 >/dev/null
-      eval $(gpg-agent --daemon --enable-ssh-support --max-cache-ttl 300 --default-cache-ttl 300)
-    fi
+    # launch the agent and get the socket path from him  
+    eval $(gpg-agent --daemon --enable-ssh-support --max-cache-ttl 300 --default-cache-ttl 300 2>/dev/null)
 
     if ! gpg --list-keys --keyid-format LONG | grep D1680A47FBA066ED 2>&1 >/dev/null ; then
       echo "Importing my public key..."
