@@ -102,10 +102,15 @@ start_gpg() {
     # launch the agent and get the socket path from him  
     eval $(gpg-agent --daemon --enable-ssh-support --max-cache-ttl 300 --default-cache-ttl 300 2>/dev/null)
 
+    # check if the key is already importer
     if ! gpg --list-keys --keyid-format LONG | grep D1680A47FBA066ED 2>&1 >/dev/null ; then
       echo "Importing my public key..."
       curl -s https://gpg.acc.si/pgp.pub | gpg --import >/dev/null 2>&1
     fi
+
+    # set git env vars so commits are signed with my key
+    export GIT_COMMITTER_NAME="Philipp Reitter"
+    export GIT_COMMITTER_EMAIL="i@philipp.ninja"
 
     case "$(uname -s)" in
         Linux*)  final_debian ;;
