@@ -100,7 +100,14 @@ start_gpg() {
 
     # no agent found (agent may not be running)
     # launch the agent and get the socket path from him  
-    eval $(gpg-agent --daemon --enable-ssh-support --max-cache-ttl 300 --default-cache-ttl 300 2>/dev/null)
+    START_GPG="gpg-agent --daemon --enable-ssh-support --max-cache-ttl 300 --default-cache-ttl 300"
+    eval $(${START_GPG} 2>/dev/null)
+
+    if [ ! -S "$SSH_AUTH_SOCK" ] ; then
+      (>&2 echo "gpg-agent seems to be running without ssh-support, restarting..." )
+      gpgconf --kill gpg-agent
+      eval $(${START_GPG} >/dev/null)
+    fi
 
     # check if the key is already importer
     if ! gpg --list-keys --keyid-format LONG | grep D1680A47FBA066ED 2>&1 >/dev/null ; then
@@ -122,4 +129,3 @@ start_gpg() {
 }
 
 yes_or_no "Start gpg agent?" && start_gpg
-
