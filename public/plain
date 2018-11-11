@@ -106,7 +106,7 @@ start_gpg() {
     if [ ! -S "$SSH_AUTH_SOCK" ] ; then
       (>&2 echo "gpg-agent seems to be running without ssh-support, restarting..." )
       gpgconf --kill gpg-agent
-      eval $(${START_GPG} >/dev/null)
+      eval $(${START_GPG} 2>/dev/null)
     fi
 
     # check if the key is already importer
@@ -129,3 +129,4 @@ start_gpg() {
 }
 
 yes_or_no "Start gpg agent?" && start_gpg
+
