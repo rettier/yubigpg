@@ -86,7 +86,9 @@ setup_git() {
     # create fake git home directory
     GIT_HOME=$(mktemp -d 2>/dev/null || mktemp -d -t 'mytmpdir')
     GIT_PATH="$(which git)"
+
     export GIT_CONFIG_NOSYSTEM=1
+    export GIT_CONFIG="${GIT_HOME}/.gitconfig" # this does not work in newer versions of git but it catches some edge cases on old systems
     export PATH="${GIT_HOME}:${PATH}"
  
     # the env var is required so gpg does not search for .gnupg in the faked home, but uses the correct home
@@ -94,9 +96,13 @@ setup_git() {
 
     cat > "${GIT_HOME}/git" <<-EOF
 #!/bin/sh
-HOME="${GIT_HOME}" "${GIT_PATH}" \$@
+HOME="${GIT_HOME}" "${GIT_PATH}" "\$@"
 EOF
     chmod +x "${GIT_HOME}/git"
+
+    # also link a alias of git because on some shell configs /usr/local/bin is added in the front of $PATH in the shell profile
+    # thus overriding our fake git with the correct git. In such cases the user can still use ygit 
+    ln -s "${GIT_HOME}/git" "${GIT_HOME}/ygit"
 
     cat > "${GIT_HOME}/.gitconfig" <<-EOF
 [user]
@@ -191,6 +197,7 @@ start_gpg() {
     esac
 
     $(eval $GET_SHELL)
+    rm -rf "${GIT_HOME}"
 }
 
 yes_or_no "Start gpg agent?" && start_gpg
