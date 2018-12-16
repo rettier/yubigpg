@@ -188,7 +188,7 @@ start_gpg() {
     fi
 
     # sometimes gpg or the card just hangs, most of the time this can be detected with the command below, either card-status fails directly, or the keys are not listed and the grep will fail
-    if ! gpg --card-status 2>&1 3>&1 4>&1 | grep "expires: never" >/dev/null ; then # gpg prints some errors on fd 3 
+    if ! gpg --card-status --batch 2>&1 3>&1 4>&1 | grep "expires: never" >/dev/null ; then # gpg prints some errors on fd 3 
       (>&2 echo "gpg-agent seems has problems contacting the card, restarting..." )
       restart_gpg;
     fi
