@@ -1,5 +1,4 @@
 PUBKEY="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQC1/qOp3sDncerrKYEg3fkl42kpPJ5znC645QPzraxdUKo6gsi1/WaXYY49kdfHMfp4KZFTSFYQbnmYHO5d0RZUUTeel/85W+rUdSwXxTIxD8XUB3vYV1ocI7c582YsPVTrrPJ2c1uoGwCEuIgAnWoFLrw97qGk3yGN57WhtIqxPf8pmR8w+Qq1nMUCIsL6ztHIltzw5QvKwLhbMzJECifVMMhg+VM3iqYTJ8Dux5QraSKVBjbGGsVe1HirCo0AQ09XS5ex1oH1Hbn7M3glwmQ/N9Mq0O1Azb5+MrzfCo82fI8Zxlfwb7/tpIviNE/8oY1L1GmlRnW0qBn+prEK+dnEbnPHIaW2O3iNTuLVwJ/sVwkfLiw6tuGf6FWf8qepCp8ynpk98Z0CknpgvtqztNXpf7uoWJd1XRqKVliwHp2sb10ECpSlxDz4iymPNlw2tOQly7ZdBPJUt24BKPyRmuEJUOuQhhp90mIKZ23Aks/+YboN/gqkNwOXpUGD8v/heIij45EReDERBzKuaVMSVBoa9fRG2iomBsmybkbb/3yKzooi8IHfwiWVlNxtSTTRloADS8w5tjITMXcyZrNhdnAzAfOBWttNH/ZNuQ6YfRR5PeritP1RY9xdhTLOjZ4Mmd4gmktqZn2UZg6foIWB80hakfTsyA94qFPWYyPlv7qifQ== i@philipp.ninja"
-
 echo "keyid: 0xD1680A47FBA066ED"
 echo "pgp pub key: https://gpg.acc.si/gpg.pub"
 echo "ssh public key:"
@@ -76,6 +75,74 @@ final_osx() {
   echo UPDATESTARTUPTTY | gpg-connect-agent >/dev/null 2>&1
 }
 
+setup_git() {
+    # set up a fake home directory and a fake git command which uses this home directory
+    # this is currently the only way i know how to override .gitconfig without changing the
+    # current users config
+
+    # unset all existing git env vars 
+    unset "${!GIT_@}"
+
+    # create fake git home directory
+    GIT_HOME=$(mktemp -d 2>/dev/null || mktemp -d -t 'mytmpdir')
+    GIT_PATH="$(which git)"
+    export GIT_CONFIG_NOSYSTEM=1
+    export PATH="${GIT_HOME}:${PATH}"
+ 
+    # the env var is required so gpg does not search for .gnupg in the faked home, but uses the correct home
+    export GNUPGHOME="${GNUPGHOME:-$HOME/.gnupg}" 
+
+    cat > "${GIT_HOME}/git" <<-EOF
+#!/bin/sh
+HOME="${GIT_HOME}" "${GIT_PATH}" \$@
+EOF
+    chmod +x "${GIT_HOME}/git"
+
+    cat > "${GIT_HOME}/.gitconfig" <<-EOF
+[user]
+	email = i@philipp.ninja
+	name = Philipp Reitter
+	signingkey = A9D06F483A83269E
+[commit]
+	gpgsign = true
+[core]
+	excludesfile = ${GIT_HOME}/.globalgitignore
+	editor = vim
+EOF
+
+    # a decent global gitignore 
+    cat > "${GIT_HOME}/.globalgitignore" <<EOF
+*.pid
+*.seed
+*.pid.lock
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.grunt
+bower_components
+node_modules/
+jspm_packages/
+.npm
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.installed.cfg
+*.egg
+.idea
+*.bak
+*.sw[op]
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+EOF
+
+}
+
 start_gpg() {
     case "$(uname -s)" in
         Linux*)  setup_debian ;;
@@ -109,20 +176,18 @@ start_gpg() {
       eval $(${START_GPG} 2>/dev/null)
     fi
 
-    # check if the key is already importer
+    # check if the key is already imported
     if ! gpg --list-keys --keyid-format LONG | grep D1680A47FBA066ED 2>&1 >/dev/null ; then
       echo "Importing my public key..."
       curl -s https://gpg.acc.si/pgp.pub | gpg --import >/dev/null 2>&1
     fi
 
-    # set git env vars so commits are signed with my key
-    export GIT_COMMITTER_NAME="Philipp Reitter"
-    export GIT_COMMITTER_EMAIL="i@philipp.ninja"
+    setup_git;
 
     case "$(uname -s)" in
         Linux*)  final_debian ;;
         Darwin*) final_osx ;;
-        *)       echo "Unknown OS, hoping requirements are met..." ;;
+        *)        ;;
     esac
 
     $(eval $GET_SHELL)
