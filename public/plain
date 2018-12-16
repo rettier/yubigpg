@@ -88,7 +88,6 @@ setup_git() {
     GIT_PATH="$(which git)"
 
     export GIT_CONFIG_NOSYSTEM=1
-    export GIT_CONFIG="${GIT_HOME}/.gitconfig" # this does not work in newer versions of git but it catches some edge cases on old systems
     export PATH="${GIT_HOME}:${PATH}"
  
     # the env var is required so gpg does not search for .gnupg in the faked home, but uses the correct home
@@ -114,6 +113,8 @@ EOF
 [core]
 	excludesfile = ${GIT_HOME}/.globalgitignore
 	editor = vim
+[push]
+	default = simple
 EOF
 
     # a decent global gitignore 
