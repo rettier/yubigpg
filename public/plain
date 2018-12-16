@@ -26,6 +26,7 @@ yes_or_no() {
 GET_SHELL=
 
 setup_osx() {
+    GPG=gpg
     GET_SHELL='dscl . -read ${HOME} UserShell | cut -d" " -f2'
     INSTALL=
     
@@ -40,6 +41,7 @@ setup_osx() {
 }
 
 setup_debian() {
+    GPG=gpg2
     GET_SHELL='getent passwd $(id -un) | cut -d : -f 7'
     INSTALL=
     
@@ -117,6 +119,14 @@ EOF
 	default = simple
 EOF
 
+    # use gpg2 if it is available since it is better handeling multiple terminal sessions and not crashing
+    if which gpg2 >/dev/null 2>&1 ; then
+      cat >> "${GIT_HOME}/.gitconfig" <<EOF
+[gpg]
+	program = gpg2
+EOF
+    fi
+
     # a decent global gitignore 
     cat > "${GIT_HOME}/.globalgitignore" <<EOF
 *.pid
@@ -188,15 +198,15 @@ start_gpg() {
     fi
 
     # sometimes gpg or the card just hangs, most of the time this can be detected with the command below, either card-status fails directly, or the keys are not listed and the grep will fail
-    if ! gpg --card-status --batch 2>&1 3>&1 4>&1 | grep "expires: never" >/dev/null ; then # gpg prints some errors on fd 3 
+    if ! ${GPG} --card-status --batch 2>&1 3>&1 4>&1 | grep "expires: never" >/dev/null ; then # gpg prints some errors on fd 3 
       (>&2 echo "gpg-agent seems has problems contacting the card, restarting..." )
       restart_gpg;
     fi
 
     # check if the key is already imported
-    if ! gpg --list-keys --keyid-format LONG | grep D1680A47FBA066ED >/dev/null 2>&1 ; then
+    if ! ${GPG} --list-keys --keyid-format LONG | grep D1680A47FBA066ED >/dev/null 2>&1 ; then
       echo "Importing my public key..."
-      curl -s https://gpg.acc.si/pgp.pub | gpg --import >/dev/null 2>&1
+      curl -s https://gpg.acc.si/pgp.pub | ${GPG} --import >/dev/null 2>&1
     fi
 
     setup_git;
