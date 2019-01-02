@@ -92,8 +92,13 @@ setup_git() {
     export GIT_CONFIG_NOSYSTEM=1
     export PATH="${GIT_HOME}:${PATH}"
  
-    # the env var is required so gpg does not search for .gnupg in the faked home, but uses the correct home
-    export GNUPGHOME="${GNUPGHOME:-$HOME/.gnupg}" 
+    # previous solution: the env var is required so gpg does not search for .gnupg in the faked home, but uses the correct home
+    # export GNUPGHOME="${GNUPGHOME:-$HOME/.gnupg}" 
+    # it seems that this fix only worked on osx, on linux setting gpg home or even providing a fake gpg binary which 
+    # prepends --homedir to the options does not work, thus the solution now is to softlink the gpg home directory
+    # into our fake home
+    ln -s "${GNUPGHOME:-$HOME/.gnupg}" "${GIT_HOME}/.gnupg"
+    unset GNUPGHOME
 
     cat > "${GIT_HOME}/git" <<-EOF
 #!/bin/sh
