@@ -78,6 +78,11 @@ final_osx() {
 }
 
 setup_git() {
+    if which ygit >/dev/null 2>&1 ; then
+        # we already have a fake git home setup, no need to interleave fake gits on top of each other
+        return;
+    fi
+
     # set up a fake home directory and a fake git command which uses this home directory
     # this is currently the only way i know how to override .gitconfig without changing the
     # current users config
@@ -112,23 +117,23 @@ EOF
 
     cat > "${GIT_HOME}/.gitconfig" <<-EOF
 [user]
-	email = i@philipp.ninja
-	name = Philipp Reitter
-	signingkey = A9D06F483A83269E
+    email = i@philipp.ninja
+    name = Philipp Reitter
+    signingkey = A9D06F483A83269E
 [commit]
-	gpgsign = true
+    gpgsign = true
 [core]
-	excludesfile = ${GIT_HOME}/.globalgitignore
-	editor = vim
+    excludesfile = ${GIT_HOME}/.globalgitignore
+    editor = vim
 [push]
-	default = simple
+    default = simple
 EOF
 
     # use gpg2 if it is available since it is better handeling multiple terminal sessions and not crashing
     if which gpg2 >/dev/null 2>&1 ; then
       cat >> "${GIT_HOME}/.gitconfig" <<EOF
 [gpg]
-	program = gpg2
+    program = gpg2
 EOF
     fi
 
@@ -219,7 +224,7 @@ start_gpg() {
     case "$(uname -s)" in
         Linux*)  final_debian ;;
         Darwin*) final_osx ;;
-        *)        ;;
+        *)       ;;
     esac
 
     $(eval $GET_SHELL)
