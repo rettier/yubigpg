@@ -73,8 +73,7 @@ final_debian() {
 }
 
 final_osx() {
-  # sometimes ssh stops working but signing still works, apparently this fixes it
-  echo UPDATESTARTUPTTY | gpg-connect-agent >/dev/null 2>&1
+  return
 }
 
 setup_git() {
@@ -219,6 +218,9 @@ start_gpg() {
       echo "Importing my public key..."
       curl -s https://gpg.acc.si/pgp.pub | ${GPG} --import >/dev/null 2>&1
     fi
+
+    # sometimes ssh stops working but signing still works, sometimes this fixes it
+    echo UPDATESTARTUPTTY | gpg-connect-agent >/dev/null 2>&1
 
     setup_git;
 
